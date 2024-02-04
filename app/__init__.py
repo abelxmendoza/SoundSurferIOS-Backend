@@ -1,19 +1,22 @@
 from flask import Flask
-from .auth import auth_blueprint
-# If you have other blueprints, import them here
-# from .views import main_blueprint
+from dotenv import load_dotenv
+import os
+
+# Load environment variables
+load_dotenv()
 
 def create_app():
     app = Flask(__name__)
 
-    # Basic configuration
-    app.config['SECRET_KEY'] = 'your_secret_key'  # Use a secure secret key
-    # You can also load more configurations from a separate file
-    # app.config.from_pyfile('config.py')
+    # Set the secret key for session management
+    app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'default_secret_key')
 
     # Register blueprints
+    from .auth import auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
-    # Register other blueprints as needed
-    # app.register_blueprint(main_blueprint)
+
+    @app.route('/')
+    def index():
+        return 'Welcome to SoundSurfer!'
 
     return app

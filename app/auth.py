@@ -1,31 +1,41 @@
 from flask import Blueprint, session, request, redirect, url_for, flash
 import requests
 from base64 import b64encode
-import os  # Import os to access environment variables
+import os
 import time
+import uuid
 
-# Use os.getenv to access environment variables
-CLIENT_ID = os.getenv('CLIENT_ID')
-CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-REDIRECT_URI = os.getenv('REDIRECT_URI')
-SCOPE = os.getenv('SCOPE', 'user-library-read')  # Providing a default value
+
+# Adjusted environment variable names for clarity
+CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+REDIRECT_URI = os.getenv('SPOTIFY_REDIRECT_URI')
+SCOPE = os.getenv('SPOTIFY_SCOPE', 'user-library-read')
 
 auth_blueprint = Blueprint('auth', __name__)
 
-@auth_blueprint.route('/login')
+@app.route('/login')
 def login():
-    # Generate the Spotify authorization URL
-    auth_url = ("https://accounts.spotify.com/authorize"
-                f"?response_type=code&client_id={CLIENT_ID}"
-                f"&scope={SCOPE}&redirect_uri={REDIRECT_URI}")
+    state = str(uuid.uuid4())
+    session['state'] = state
+
+    auth_url = ("https://accounts.spotify.com/authorize?" +
+                f"response_type=code&client_id={CLIENT_ID}&scope={SCOPE}" +
+                f"&redirect_uri={REDIRECT_URI}&state={state}")
     return redirect(auth_url)
 
-@auth_blueprint.route('/callback')
+@app.route('/callback')
 def callback():
     error = request.args.get('error')
     code = request.args.get('code')
-    if error or not code:
-        flash('Authorization failed. Please try again.', 'error')
+    state = request.args.get('state')
+
+    if state != session.pop('state', None):
+        flash('State mismatch. Please try again.', 'error')
+        return redirect(url_for('.login'))
+
+    if error:
+        flash(f'Authorization failed: {error}', 'error')
         return redirect(url_for('.login'))
 
     token_info = exchange_code_for_token(code)
@@ -48,17 +58,18 @@ def exchange_code_for_token(code):
     }
     response = requests.post('https://accounts.spotify.com/api/token', data=payload, headers=headers)
     if response.ok:
-        token_info = response.json()
-        token_info['expires_at'] = int(time.time()) + token_info['expires_in']
-        return token_info
-    print(f"Failed to exchange code for token: {response.text}")
-    return None
+        return response.json()
+    else:
+        print(f"Failed to exchange code for token: {response.text}")
+        return None
 
+@app.route('/refresh_token')
 def refresh_access_token():
     token_info = session.get('token_info', {})
     refresh_token = token_info.get('refresh_token')
     if not refresh_token:
-        return None
+        flash('No refresh token available.', 'error')
+        return redirect(url_for('.login'))
 
     payload = {
         'grant_type': 'refresh_token',
@@ -74,17 +85,19 @@ def refresh_access_token():
         token_info.update(new_token_info)
         token_info['expires_at'] = int(time.time()) + new_token_info['expires_in']
         session['token_info'] = token_info
-        return token_info['access_token']
-    print(f"Failed to refresh access token: {response.text}")
-    return None
+        return redirect(url_for('.dashboard'))
+    else:
+        print(f"Failed to refresh access token: {response.text}")
+        flash('Failed to refresh access token.', 'error')
+        return redirect(url_for('.login'))
 
-@auth_blueprint.route('/logout')
+@app.route('/logout')
 def logout():
     session.pop('token_info', None)
     flash('You have been logged out.', 'info')
     return redirect(url_for('.login'))
 
-@auth_blueprint.route('/dashboard')
+@app.route('/dashboard')
 def dashboard():
     access_token = get_access_token()
     if access_token:
@@ -102,3 +115,4 @@ def get_access_token():
     if not token_info or is_token_expired(token_info):
         return refresh_access_token()
     return token_info['access_token']
+
