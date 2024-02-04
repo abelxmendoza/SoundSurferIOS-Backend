@@ -50,11 +50,14 @@ def dashboard():
         flash('Access token is unavailable. Please log in again.', 'warning')
         return redirect(url_for('auth.login'))
 
+
+
 def get_access_token():
     token_info = session.get('token_info', {})
     if not token_info or is_token_expired(token_info):
-        return refresh_access_token()
+        return refresh_access_token(token_info.get('refresh_token'))
     return token_info['access_token']
+
 
 def is_token_expired(token_info):
     return int(time.time()) > token_info.get('expires_at', 0)
