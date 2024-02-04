@@ -1,6 +1,16 @@
-from . import create_app
+from flask import Flask, render_template
+from .auth import auth_blueprint
+# Import other blueprints if you have any
 
-app = create_app()
+def create_app():
+    app = Flask(__name__)
+    # app configuration settings...
 
-if __name__ == '__main__':
-    app.run()
+    app.register_blueprint(auth_blueprint, url_prefix='/auth')
+    # Register other blueprints...
+
+    @app.route('/')
+    def index():
+        return 'Welcome to SoundSurfer!'
+
+    return app
