@@ -1,6 +1,7 @@
 from flask import Flask
 from flask_mysqldb import MySQL
 
+
 app = Flask(__name__)
 # Configuration for Flask-MySQLdb
 app.config['MYSQL_USER'] = 'your_mysql_username'
