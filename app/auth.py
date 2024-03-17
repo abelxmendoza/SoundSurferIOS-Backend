@@ -6,6 +6,7 @@ from base64 import b64encode
 import time
 from .spotify import get_spotify_auth_url, exchange_code_for_token, get_saved_tracks, refresh_access_token
 
+
 auth_blueprint = Blueprint('auth', __name__)
 
 @auth_blueprint.route('/login')
@@ -67,3 +68,4 @@ def logout():
     session.pop('token_info', None)
     flash('You have been logged out.', 'info')
     return redirect(url_for('auth.login'))
+
