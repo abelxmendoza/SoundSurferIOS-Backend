@@ -6,54 +6,58 @@ app = Flask(__name__)
 app.config['MYSQL_USER'] = 'your_mysql_username'
 app.config['MYSQL_PASSWORD'] = 'your_mysql_password'
 app.config['MYSQL_DB'] = 'your_database_name'
-app.config['MYSQL_CURSORCLASS'] = 'DictCursor'  # This is optional, it allows the cursor to return the query result as a dictionary
+app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 
 mysql = MySQL(app)
 
-# User
-def create_user(username, email):
+# User functions
+def create_user(spotify_user_id, email):
     cursor = mysql.connection.cursor()
-    query = "INSERT INTO users (username, email) VALUES (%s, %s)"
-    cursor.execute(query, (username, email))
+    query = "INSERT INTO users (spotify_user_id, email) VALUES (%s, %s)"
+    cursor.execute(query, (spotify_user_id, email))
     mysql.connection.commit()
     cursor.close()
 
-def get_user_by_id(user_id):
+def get_user_by_spotify_id(spotify_user_id):
     cursor = mysql.connection.cursor()
-    query = "SELECT * FROM users WHERE id = %s"
-    cursor.execute(query, (user_id,))
+    query = "SELECT * FROM users WHERE spotify_user_id = %s"
+    cursor.execute(query, (spotify_user_id,))
     user = cursor.fetchone()
     cursor.close()
     return user
 
-# Song
-def create_song(title, artist, album, playlist_id):
+# Song functions
+def like_song(spotify_user_id, spotify_track_id):
     cursor = mysql.connection.cursor()
-    query = "INSERT INTO songs (title, artist, album, playlist_id) VALUES (%s, %s, %s, %s)"
-    cursor.execute(query, (title, artist, album, playlist_id))
+    query = """
+        INSERT INTO liked_songs (user_id, spotify_track_id)
+        SELECT id, %s FROM users WHERE spotify_user_id = %s
+    """
+    cursor.execute(query, (spotify_track_id, spotify_user_id))
     mysql.connection.commit()
     cursor.close()
 
-def get_song_by_id(song_id):
+def unlike_song(spotify_user_id, spotify_track_id):
     cursor = mysql.connection.cursor()
-    query = "SELECT * FROM songs WHERE id = %s"
-    cursor.execute(query, (song_id,))
-    song = cursor.fetchone()
-    cursor.close()
-    return song
-
-# Playlist
-def create_playlist(name, user_id):
-    cursor = mysql.connection.cursor()
-    query = "INSERT INTO playlists (name, user_id, created_at) VALUES (%s, %s, NOW())"
-    cursor.execute(query, (name, user_id))
+    query = """
+        DELETE liked_songs
+        FROM liked_songs
+        JOIN users ON liked_songs.user_id = users.id
+        WHERE users.spotify_user_id = %s AND liked_songs.spotify_track_id = %s
+    """
+    cursor.execute(query, (spotify_user_id, spotify_track_id))
     mysql.connection.commit()
     cursor.close()
 
-def get_playlist_by_id(playlist_id):
+def get_liked_songs(spotify_user_id):
     cursor = mysql.connection.cursor()
-    query = "SELECT * FROM playlists WHERE id = %s"
-    cursor.execute(query, (playlist_id,))
-    playlist = cursor.fetchone()
+    query = """
+        SELECT liked_songs.spotify_track_id
+        FROM liked_songs
+        JOIN users ON liked_songs.user_id = users.id
+        WHERE users.spotify_user_id = %s
+    """
+    cursor.execute(query, (spotify_user_id,))
+    songs = cursor.fetchall()
     cursor.close()
-    return playlist
+    return songs
